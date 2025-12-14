@@ -89,5 +89,4 @@ streamlit run app.py
 *   股票代號需符合 Yahoo Finance 格式（台股請加上 `.TW` 後綴）。
 *   本工具僅供參考，投資請自行審慎評估風險。
 
----
-Created by [Your Name]
+
