@@ -11,6 +11,12 @@
     *   基本面亮點與風險
     *   **財報深度解讀** (New!)：結合最新法說會與財報重點進行分析
     *   短/長線投資建議
+*   **投資組合健檢** (New!)：
+    *   視覺化資產配置（圓餅圖）。
+    *   AI 擔任投資教練，評估風險集中度並給予心態建議。
+*   **自動化日報助理** (New!)：
+    *   一鍵生成每日市場摘要與 AI 點評。
+    *   整合 Email 寄送功能，輕鬆訂閱自己的投資日報。
 *   **直觀的操作介面**：簡潔的 Streamlit 側邊欄與儀表板設計，操作流暢。
 
 ## 🛠️ 技術堆疊
@@ -19,6 +25,8 @@
 *   **數據源 (Data)**: [yfinance](https://pypi.org/project/yfinance/)
 *   **AI 核心 (LLM)**: [Google Generative AI (Gemini)](https://ai.google.dev/)
 *   **繪圖 (Charts)**: [Plotly](https://plotly.com/python/)
+*   **PDF 解析**: [pdfplumber](https://github.com/jsvine/pdfplumber)
+*   **郵件發送**: Python `smtplib`
 
 ## 🚀 快速開始
 
@@ -36,13 +44,18 @@ pip install -r requirements.txt
 
 ### 3. 設定環境變數
 
-在專案根目錄建立一個 `.env` 檔案，並填入您的 Google API Key：
+在專案根目錄建立一個 `.env` 檔案，並填入您的 Google API Key 與 Email 設定（若要使用自動寄信功能）：
 
 ```text
 GOOGLE_API_KEY=您的_Google_API_Key
+MAIL_USERNAME=您的Gmail帳號
+MAIL_PASSWORD=您的Gmail應用程式密碼
+MAIL_TO=接收報告的Email
 ```
 
-> 💡 **提示**：您可以前往 [Google AI Studio](https://aistudio.google.com/) 免費獲取 API Key。
+> 💡 **提示**：
+> 1. 您可以前往 [Google AI Studio](https://aistudio.google.com/) 免費獲取 API Key。
+> 2. Gmail 需開啟「兩步驟驗證」並申請 **[應用程式密碼](https://myaccount.google.com/appwords)** 才能透過程式寄信。
 
 ### 4. 啟動應用程式
 
@@ -56,12 +69,19 @@ streamlit run app.py
 
 ## 📖 操作說明
 
-1.  在左側 **側邊欄** 輸入欲查詢的 **台股代號**（例如：`2330.TW` 台積電, `2454.TW` 聯發科）。
-2.  點擊 **「開始 AI 診斷」** 按鈕。
-3.  系統將自動：
-    *   顯示即時股價、漲跌幅與本益比。
-    *   繪製 K 線圖與 20MA 均線。
-    *   生成並顯示 Gemini AI 的專業分析報告。
+### 1. 個股全方位分析
+*   輸入股票代號（如 `2330.TW`）。
+*   (選填) 上傳財報 PDF 以進行更深度的 RAG 分析。
+*   點擊「開始 AI 診斷」查看報告。
+
+### 2. 投資組合健檢
+*   在表格中輸入您的持倉與比例。
+*   點擊「分析投資組合」查看資產分佈與 AI 風險評估。
+
+### 3. 自動化日報助理
+*   設定觀察名單 (Watchlist)。
+*   生成今日市場摘要與 AI 點評。
+*   一鍵寄送 Email 給自己。
 
 ## ⚠️ 注意事項
 
