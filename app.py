@@ -5,6 +5,8 @@ import plotly.graph_objects as go
 from dotenv import load_dotenv
 import os
 import pandas as pd
+import requests
+import time
 
 # Step 1: 環境設定 - 載入環境變數
 load_dotenv(override=True)
@@ -35,8 +37,37 @@ def get_stock_data(ticker):
         st.error(f"獲取數據時發生錯誤: {e}")
         return None, None
 
+def get_financial_report_text(ticker):
+    """
+    模擬爬取公開財報 PDF 並轉為文字。
+    真實情境可使用 requests + pdfplumber 針對公開資訊觀測站 (MOPS) 進行爬取。
+    """
+    # 模擬網路請求延遲
+    time.sleep(1.5)
+    
+    # 針對台積電 (2330.TW) 提供較真實的模擬數據
+    if "2330" in ticker:
+        return """
+        【2024年第三季法說會重點摘要】
+        1. 營收表現：第三季合併營收約新台幣7,596億9千萬元，稅後純益約新台幣3,252億6千萬元，每股盈餘為新台幣12.54元。
+        2. 毛利率：第三季毛利率為57.8%，營業利益率為47.5%，稅後純益率為42.8%。
+        3. 先進製程：3奈米製程出貨佔第三季晶圓銷售金額的20%，5奈米製程出貨佔全季晶圓銷售金額的32%；7奈米及更先進製程佔全季晶圓銷售金額的69%。
+        4. 未來展望：受惠於AI需求強勁，預期第四季營收將持續成長。HPC（高效能運算）平台需求依然是主要成長動能。
+        5. 資本支出：維持全年資本支出目標不變，約在300億至320億美元之間。
+        """
+    else:
+        # 其他股票的通用模擬數據
+        return f"""
+        【{ticker} 近期財務報告摘要】
+        1. 營運概況：本季營收較去年同期呈現穩定趨勢，主要受惠於市場需求回溫。
+        2. 獲利能力：毛利率維持在產業平均水準，公司持續優化成本結構。
+        3. 市場展望：管理層對未來兩季持審慎樂觀態度，將持續投入研發以增強競爭力。
+        4. 風險提示：需留意匯率波動及原物料價格變化對獲利的影響。
+        (註：此為模擬生成的通用財報文字，僅供系統測試使用)
+        """
+
 # Step 3: Gemini AI 分析模組
-def analyze_with_gemini(ticker, price_data, stock_info):
+def analyze_with_gemini(ticker, price_data, stock_info, report_text):
     """
     使用 Gemini AI 進行專業財報與趨勢分析
     """
@@ -66,13 +97,16 @@ def analyze_with_gemini(ticker, price_data, stock_info):
         - 每股盈餘 (EPS): {eps}
         - 市值: {market_cap}
         
+        【最新財報/法說會重點 (模擬數據)】
+        {report_text}
+        
         【分析要求】
-        你一位華爾街等級的專業台股分析師，請針對提供的數據進行診斷。
+        你一位華爾街等級的專業台股分析師，請針對提供的數據與財報內容進行診斷。
         請使用繁體中文，並以 Markdown 格式輸出。
         報告結構需包含：
-        1. 市場趨勢判斷（多/空/盤整）
-        2. 基本面亮點與風險
-        3. 投資建議（短線/長線）
+        1. 市場趨勢判斷（多/空/盤整）：結合技術面(均線)與基本面數據。
+        2. 財報深度解讀：請具體引用【最新財報】中的內容進行分析（如毛利率、AI需求等）。
+        3. 投資建議（短線/長線）：給出具體的操作建議。
         """
 
         # 呼叫 API
@@ -135,8 +169,14 @@ def main():
 
             # 主畫面區塊 3: AI 報告
             st.subheader("🤖 Gemini 投資顧問分析報告")
-            with st.spinner("Gemini 正在分析財報與趨勢..."):
-                analysis_result = analyze_with_gemini(ticker_input, history, info)
+            
+            # 新增：獲取財報文字
+            with st.spinner("正在爬取最新財報與法說會資料 (模擬)..."):
+                report_text = get_financial_report_text(ticker_input)
+                st.info("已成功獲取財報文字數據，AI 正在進行深度解讀...")
+            
+            with st.spinner("Gemini 正在撰寫分析報告..."):
+                analysis_result = analyze_with_gemini(ticker_input, history, info, report_text)
                 st.markdown(analysis_result)
 
         else:
