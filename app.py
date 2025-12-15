@@ -50,6 +50,15 @@ def extract_text_from_pdf(uploaded_file):
     except Exception as e:
         return f"PDF 解析失敗: {e}"
 
+def format_market_cap(value):
+    """將市值轉換為 '億' 單位"""
+    try:
+        if value and isinstance(value, (int, float)):
+            return f"{value / 100000000:.2f} 億"
+        return "N/A"
+    except:
+        return "N/A"
+
 def get_financial_report_text(ticker):
     """模擬爬取公開財報 PDF 並轉為文字 (Fallback)"""
     time.sleep(1.5)
@@ -90,7 +99,7 @@ def page_stock_analysis():
             c1, c2, c3 = st.columns(3)
             c1.metric("目前股價", f"{latest_close:.2f}", f"{change:.2f} ({pct_change:.2f}%)")
             c2.metric("本益比 (PE)", f"{info.get('trailingPE', 'N/A')}")
-            c3.metric("市值", f"{info.get('marketCap', 'N/A')}")
+            c3.metric("市值", format_market_cap(info.get('marketCap')))
 
             # 2. K線圖
             history['MA20'] = history['Close'].rolling(window=20).mean()
@@ -99,7 +108,7 @@ def page_stock_analysis():
                             low=history['Low'], close=history['Close'], name='K線'))
             fig.add_trace(go.Scatter(x=history.index, y=history['MA20'], mode='lines', name='MA20', line=dict(color='orange')))
             fig.update_layout(height=400, xaxis_rangeslider_visible=False)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
             # 3. AI 分析
             st.subheader("🤖 Gemini 深度分析報告")
@@ -119,9 +128,10 @@ def page_stock_analysis():
                     genai.configure(api_key=GOOGLE_API_KEY)
                     model = genai.GenerativeModel('gemini-2.5-flash')
                     
+                    market_cap_str = format_market_cap(info.get('marketCap'))
                     prompt = f"""
                     請分析台股 {ticker_input}。
-                    【技術面數據】收盤: {latest_close}, MA20: {history['MA20'].iloc[-1]}
+                    【技術面數據】收盤: {latest_close}, MA20: {history['MA20'].iloc[-1]}, 市值: {market_cap_str}
                     【財報/法說會內容】
                     {report_text[:10000]} (內容過長已截斷)
                     
@@ -242,15 +252,182 @@ def page_daily_report():
                     st.error("請填寫完整的 Email 設定資訊")
 
 # ==========================================
+# 頁面 4: 基本面 AI 分析
+# ==========================================
+
+def page_fundamental_analysis():
+    st.header("📊 基本面 AI 分析")
+    st.info("深入分析公司財務報表：損益表、資產負債表與現金流量表。")
+
+    ticker_input = st.text_input("輸入股票代號", value="2330.TW", key="fund_ticker")
+    
+    if st.button("開始基本面分析"):
+        with st.spinner("正在獲取財務數據..."):
+            try:
+                stock = yf.Ticker(ticker_input)
+                info = stock.info
+                
+                # 獲取三大報表 (年報)
+                financials = stock.financials.T  # 損益表
+                balance_sheet = stock.balance_sheet.T  # 資產負債表
+                cashflow = stock.cashflow.T  # 現金流量表
+                
+                # 顯示基本資訊
+                col1, col2, col3 = st.columns(3)
+                col1.metric("目前股價", f"{info.get('currentPrice', 'N/A')}")
+                col2.metric("市值", format_market_cap(info.get('marketCap')))
+                col3.metric("產業", f"{info.get('industry', 'N/A')}")
+
+                # 建立分頁
+                tab1, tab2, tab3, tab4 = st.tabs(["損益表分析", "資產負債表分析", "現金流量表分析", "AI 綜合診斷"])
+
+                # 1. 損益表分析
+                with tab1:
+                    st.subheader("損益表關鍵指標")
+                    if not financials.empty:
+                        # 嘗試選取關鍵欄位 (yfinance 欄位名稱可能會變，需做容錯)
+                        cols_to_plot = ['Total Revenue', 'Gross Profit', 'Operating Income', 'Net Income']
+                        available_cols = [c for c in cols_to_plot if c in financials.columns]
+                        
+                        # 中文對照表
+                        col_map = {
+                            'Total Revenue': '總營收', 
+                            'Gross Profit': '毛利', 
+                            'Operating Income': '營業利益', 
+                            'Net Income': '淨利'
+                        }
+
+                        if available_cols:
+                            df_plot = financials[available_cols].sort_index()
+                            # 重新命名欄位為中文
+                            df_plot = df_plot.rename(columns=col_map)
+                            
+                            fig = px.bar(df_plot, barmode='group', title="年度營收與獲利趨勢")
+                            st.plotly_chart(fig, width="stretch")
+                            st.dataframe(financials.head())
+                        else:
+                            st.warning("無法抓取完整的損益表欄位")
+                            st.dataframe(financials)
+                    else:
+                        st.warning("無損益表數據")
+
+                # 2. 資產負債表分析
+                with tab2:
+                    st.subheader("資產負債結構")
+                    if not balance_sheet.empty:
+                        cols_to_plot = ['Total Assets', 'Total Liabilities Net Minority Interest', 'Stockholders Equity']
+                        # 修正：有些版本 yfinance 欄位名稱不同
+                        if 'Total Liabilities Net Minority Interest' not in balance_sheet.columns:
+                             if 'Total Liabilities' in balance_sheet.columns:
+                                 cols_to_plot[1] = 'Total Liabilities'
+                        
+                        available_cols = [c for c in cols_to_plot if c in balance_sheet.columns]
+                        
+                        # 中文對照表
+                        col_map = {
+                            'Total Assets': '總資產',
+                            'Total Liabilities Net Minority Interest': '總負債',
+                            'Total Liabilities': '總負債',
+                            'Stockholders Equity': '股東權益'
+                        }
+
+                        if available_cols:
+                            df_plot = balance_sheet[available_cols].sort_index()
+                            # 重新命名欄位為中文
+                            df_plot = df_plot.rename(columns=col_map)
+
+                            fig = px.bar(df_plot, barmode='group', title="資產負債結構趨勢")
+                            st.plotly_chart(fig, width="stretch")
+                            st.dataframe(balance_sheet.head())
+                        else:
+                            st.warning("無法抓取完整的資產負債表欄位")
+                            st.dataframe(balance_sheet)
+                    else:
+                        st.warning("無資產負債表數據")
+
+                # 3. 現金流量表分析
+                with tab3:
+                    st.subheader("現金流量分析")
+                    if not cashflow.empty:
+                        cols_to_plot = ['Operating Cash Flow', 'Investing Cash Flow', 'Financing Cash Flow']
+                        available_cols = [c for c in cols_to_plot if c in cashflow.columns]
+                        
+                        # 中文對照表
+                        col_map = {
+                            'Operating Cash Flow': '營運現金流',
+                            'Investing Cash Flow': '投資現金流',
+                            'Financing Cash Flow': '籌資現金流'
+                        }
+
+                        if available_cols:
+                            df_plot = cashflow[available_cols].sort_index()
+                            # 重新命名欄位為中文
+                            df_plot = df_plot.rename(columns=col_map)
+
+                            fig = px.bar(df_plot, barmode='group', title="現金流量趨勢")
+                            st.plotly_chart(fig, width="stretch")
+                            st.dataframe(cashflow.head())
+                        else:
+                            st.warning("無法抓取完整的現金流量表欄位")
+                            st.dataframe(cashflow)
+                    else:
+                        st.warning("無現金流量表數據")
+
+                # 4. AI 綜合診斷
+                with tab4:
+                    st.subheader("🤖 Gemini 財務健康診斷書")
+                    
+                    if GOOGLE_API_KEY:
+                        with st.spinner("AI 正在閱讀財報並進行分析..."):
+                            # 準備數據給 AI (取最近兩年)
+                            fin_summary = financials.iloc[:2].to_string() if not financials.empty else "無數據"
+                            bs_summary = balance_sheet.iloc[:2].to_string() if not balance_sheet.empty else "無數據"
+                            cf_summary = cashflow.iloc[:2].to_string() if not cashflow.empty else "無數據"
+                            
+                            prompt = f"""
+                            請擔任專業的財務分析師，針對 {ticker_input} 的財務報表進行深度分析。
+                            
+                            【損益表摘要 (近兩年)】
+                            {fin_summary}
+                            
+                            【資產負債表摘要 (近兩年)】
+                            {bs_summary}
+                            
+                            【現金流量表摘要 (近兩年)】
+                            {cf_summary}
+                            
+                            請提供以下分析報告 (使用繁體中文 Markdown)：
+                            1. **獲利能力分析**：營收成長率、毛利率、淨利率的變化趨勢。
+                            2. **財務結構與償債能力**：資產負債配置是否健康？有無流動性風險？
+                            3. **現金流品質**：營業現金流是否充足？投資活動是否積極？
+                            4. **綜合評價**：給予該公司基本面評分 (1-10分) 與投資建議。
+                            """
+                            
+                            try:
+                                genai.configure(api_key=GOOGLE_API_KEY)
+                                model = genai.GenerativeModel('gemini-2.5-flash')
+                                response = model.generate_content(prompt)
+                                st.markdown(response.text)
+                            except Exception as e:
+                                st.error(f"AI 分析失敗: {e}")
+                    else:
+                        st.warning("請設定 GOOGLE_API_KEY 以啟用 AI 分析功能")
+
+            except Exception as e:
+                st.error(f"發生錯誤: {e}")
+
+# ==========================================
 # 主程式路由
 # ==========================================
 
 def main():
     st.sidebar.title("台股 AI 助理")
-    page = st.sidebar.radio("功能選單", ["個股全方位分析", "投資組合健檢", "自動化日報助理"])
+    page = st.sidebar.radio("功能選單", ["個股全方位分析", "基本面 AI 分析", "投資組合健檢", "自動化日報助理"])
 
     if page == "個股全方位分析":
         page_stock_analysis()
+    elif page == "基本面 AI 分析":
+        page_fundamental_analysis()
     elif page == "投資組合健檢":
         page_portfolio()
     elif page == "自動化日報助理":
