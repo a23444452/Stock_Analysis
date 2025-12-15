@@ -11,6 +11,7 @@ import time
 import pdfplumber
 import datetime
 from daily_report import get_market_summary, generate_ai_report, send_email
+from dca_tool import calculate_dca_performance
 
 # Step 1: 環境設定 - 載入環境變數
 load_dotenv(override=True)
@@ -417,12 +418,115 @@ def page_fundamental_analysis():
                 st.error(f"發生錯誤: {e}")
 
 # ==========================================
+# 頁面 5: 定期定額回測
+# ==========================================
+
+def page_dca_backtest():
+    st.header("⏳ 定期定額 (DCA) 歷史回測")
+    st.info("模擬每月固定金額投資，計算歷史報酬與風險，並由 AI 進行策略分析。")
+
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.subheader("參數設定")
+        ticker_input = st.text_input("輸入股票代號", value="2330.TW", key="dca_ticker")
+        monthly_amount = st.number_input("每月扣款金額 (TWD)", min_value=1000, value=10000, step=1000)
+        years = st.selectbox("回測年數", [1, 3, 5, 10], index=1)
+        
+        run_dca = st.button("開始回測")
+
+    if run_dca:
+        with st.spinner(f"正在回測 {ticker_input} 過去 {years} 年的表現..."):
+            df_result, metrics = calculate_dca_performance(ticker_input, monthly_amount, years)
+            
+            if df_result is not None:
+                # 1. 顯示績效指標
+                st.subheader("📊 回測結果")
+                m1, m2, m3, m4 = st.columns(4)
+                
+                total_cost = metrics['total_cost']
+                final_val = metrics['final_value']
+                ret_pct = metrics['total_return_pct']
+                mdd = metrics['max_drawdown']
+                
+                m1.metric("總投入成本", f"${total_cost:,.0f}")
+                m2.metric("最終資產價值", f"${final_val:,.0f}", f"{metrics['total_return']:,.0f} ({ret_pct:.2f}%)")
+                m3.metric("最大回撤 (MDD)", f"{mdd:.2f}%", delta_color="inverse") # MDD 越小越好，所以用 inverse
+                m4.metric("年化波動率", f"{metrics['volatility']:.2f}%", delta_color="inverse")
+
+                # 2. 繪製資產曲線圖
+                st.subheader("📈 資產成長曲線")
+                fig = go.Figure()
+                
+                # 繪製資產價值
+                fig.add_trace(go.Scatter(
+                    x=df_result.index, 
+                    y=df_result['Portfolio_Value'], 
+                    mode='lines', 
+                    name='資產價值',
+                    line=dict(color='#00CC96', width=2),
+                    fill='tozeroy', # 填滿下方區域
+                    fillcolor='rgba(0, 204, 150, 0.1)'
+                ))
+                
+                # 繪製投入成本 (階梯狀)
+                fig.add_trace(go.Scatter(
+                    x=df_result.index, 
+                    y=df_result['Total_Cost'], 
+                    mode='lines', 
+                    name='累積投入成本',
+                    line=dict(color='#EF553B', width=2, dash='dash')
+                ))
+
+                fig.update_layout(
+                    title=f"{ticker_input} 定期定額 {years} 年績效走勢",
+                    xaxis_title="日期",
+                    yaxis_title="金額 (TWD)",
+                    hovermode="x unified",
+                    legend=dict(orientation="h", y=1.02, yanchor="bottom", x=1, xanchor="right")
+                )
+                st.plotly_chart(fig, width="stretch")
+
+                # 3. AI 策略分析
+                st.subheader("🤖 Gemini 策略分析報告")
+                if GOOGLE_API_KEY:
+                    with st.spinner("AI 正在分析此策略的風險與報酬..."):
+                        prompt = f"""
+                        請分析以下「定期定額 (DCA)」投資策略的績效：
+                        
+                        *   **標的**：{ticker_input}
+                        *   **期間**：過去 {years} 年
+                        *   **每月投入**：{monthly_amount} TWD
+                        *   **總報酬率**：{ret_pct:.2f}%
+                        *   **最大回撤 (MDD)**：{mdd:.2f}% (這段期間資產從高點下跌的最大幅度)
+                        *   **年化波動率**：{metrics['volatility']:.2f}%
+                        
+                        請提供一份專業的分析報告 (使用繁體中文 Markdown)：
+                        1.  **績效評價**：這樣的報酬率在該期間是否優於大盤或定存？
+                        2.  **風險分析**：MDD {mdd:.2f}% 代表投資人需承受多大的心理壓力？波動率是否過高？
+                        3.  **微笑曲線效應**：根據走勢 (AI 無法看圖，請根據一般 DCA 特性說明)，這段期間是否有發揮定期定額「低檔多買」的優勢？
+                        4.  **投資建議**：適合哪種類型的投資人？(保守/穩健/積極)
+                        """
+                        
+                        try:
+                            genai.configure(api_key=GOOGLE_API_KEY)
+                            model = genai.GenerativeModel('gemini-2.5-flash')
+                            response = model.generate_content(prompt)
+                            st.markdown(response.text)
+                        except Exception as e:
+                            st.error(f"AI 分析失敗: {e}")
+                else:
+                    st.warning("請設定 GOOGLE_API_KEY 以啟用 AI 分析功能")
+            else:
+                st.error(f"回測失敗: {metrics.get('error')}")
+
+# ==========================================
 # 主程式路由
 # ==========================================
 
 def main():
     st.sidebar.title("台股 AI 助理")
-    page = st.sidebar.radio("功能選單", ["個股全方位分析", "基本面 AI 分析", "投資組合健檢", "自動化日報助理"])
+    page = st.sidebar.radio("功能選單", ["個股全方位分析", "基本面 AI 分析", "投資組合健檢", "定期定額回測", "自動化日報助理"])
 
     if page == "個股全方位分析":
         page_stock_analysis()
@@ -430,6 +534,8 @@ def main():
         page_fundamental_analysis()
     elif page == "投資組合健檢":
         page_portfolio()
+    elif page == "定期定額回測":
+        page_dca_backtest()
     elif page == "自動化日報助理":
         page_daily_report()
 
