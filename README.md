@@ -24,16 +24,21 @@
 *   **自動化日報助理** (New!)：
     *   一鍵生成每日市場摘要與 AI 點評。
     *   整合 Email 寄送功能，輕鬆訂閱自己的投資日報。
+*   **LINE Bot 串接** (New!)：
+    *   透過 LINE 聊天室直接查詢個股 AI 分析報告。
+    *   整合 n8n 自動化流程與 Python API。
 *   **直觀的操作介面**：簡潔的 Streamlit 側邊欄與儀表板設計，操作流暢。
 
 ## 🛠️ 技術堆疊
 
 *   **介面 (UI)**: [Streamlit](https://streamlit.io/)
+*   **API 服務**: [FastAPI](https://fastapi.tiangolo.com/)
 *   **數據源 (Data)**: [yfinance](https://pypi.org/project/yfinance/)
 *   **AI 核心 (LLM)**: [Google Generative AI (Gemini)](https://ai.google.dev/)
 *   **繪圖 (Charts)**: [Plotly](https://plotly.com/python/)
 *   **PDF 解析**: [pdfplumber](https://github.com/jsvine/pdfplumber)
 *   **郵件發送**: Python `smtplib`
+*   **自動化**: [n8n](https://n8n.io/)
 
 ## 🚀 快速開始
 
@@ -66,13 +71,17 @@ MAIL_TO=接收報告的Email
 
 ### 4. 啟動應用程式
 
-在終端機執行：
+**啟動 Streamlit 網頁介面：**
 
 ```bash
 streamlit run app.py
 ```
 
-程式啟動後，瀏覽器將自動開啟應用程式頁面（預設為 `http://localhost:8501`）。
+**啟動 API Server (供 LINE Bot 使用)：**
+
+```bash
+uvicorn api:app --reload --port 8001
+```
 
 ## 📖 操作說明
 
@@ -99,6 +108,10 @@ streamlit run app.py
 *   設定觀察名單 (Watchlist)。
 *   生成今日市場摘要與 AI 點評。
 *   一鍵寄送 Email 給自己。
+
+### 6. LINE Bot 串接 (進階)
+本專案支援透過 LINE 聊天機器人進行互動。詳細設定步驟請參考：
+👉 **[LINE + n8n + Python 串接指南](n8n_guide.md)**
 
 ## ⚠️ 注意事項
 
