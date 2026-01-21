@@ -37,5 +37,7 @@ async def run_analysis(request: StockRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    # 讓 API 跑在 0.0.0.0:8001
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    import os
+    # Railway 會提供 PORT 環境變數，本地開發則用 8001
+    port = int(os.getenv("PORT", 8001))
+    uvicorn.run(app, host="0.0.0.0", port=port)
