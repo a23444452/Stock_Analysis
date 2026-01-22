@@ -39,6 +39,7 @@
 *   **PDF 解析**: [pdfplumber](https://github.com/jsvine/pdfplumber)
 *   **郵件發送**: Python `smtplib`
 *   **自動化**: [n8n](https://n8n.io/)
+*   **雲端部署**: [Railway](https://railway.app/)
 
 ## 🚀 快速開始
 
@@ -110,7 +111,11 @@ uvicorn api:app --reload --port 8001
 *   一鍵寄送 Email 給自己。
 
 ### 6. LINE Bot 串接 (進階)
-本專案支援透過 LINE 聊天機器人進行互動。詳細設定步驟請參考：
+本專案支援透過 LINE 聊天機器人進行互動。您可以選擇：
+*   **Railway 雲端部署**（推薦）：獲得固定網址，24/7 穩定運行
+*   **Ngrok 本地測試**：適合開發階段快速測試
+
+詳細設定步驟請參考：
 👉 **[LINE + n8n + Python 串接指南](n8n_guide.md)**
 
 ## ⚠️ 注意事項

@@ -35,19 +35,40 @@ graph LR
 
 ---
 
-## 步驟 2：讓外網能存取您的 API (使用 Ngrok)
+## 步驟 2：讓外網能存取您的 API
 
-由於 n8n (如果是雲端版) 或 LINE 無法直接存取您電腦上的 `localhost:8001`，我們需要使用 Ngrok 建立一個臨時通道。
+由於 n8n (如果是雲端版) 或 LINE 無法直接存取您電腦上的 `localhost:8001`，您有兩種選擇：
+
+### 選項 A：部署到 Railway（推薦，適合長期使用）
+
+將 API 部署到雲端，獲得固定網址，24/7 穩定運行。
+
+1.  **前往 [Railway.app](https://railway.app/)** 並用 GitHub 帳號登入
+2.  點擊 **New Project** → **Deploy from GitHub repo**
+3.  選擇您的 `Stock_Analysis` 專案
+4.  部署完成後，進入 **Variables** 頁籤，新增環境變數：
+    - `GOOGLE_API_KEY`: 您的 Google API Key
+5.  進入 **Settings** → **Networking** → **Generate Domain**
+6.  複製產生的網址，例如：`https://your-app.up.railway.app`
+
+> 💡 Railway 免費方案每月有 $5 額度，一般使用量足夠。
+
+### 選項 B：使用 Ngrok（適合本地測試）
 
 1.  **下載並安裝 Ngrok**: [https://ngrok.com/download](https://ngrok.com/download)
-2.  **啟動 Ngrok**
+2.  **啟動本地 API**
+    ```bash
+    uvicorn api:app --reload --port 8001
+    ```
+3.  **啟動 Ngrok**
     開啟一個新的終端機視窗，執行：
     ```bash
     ngrok http 8001
     ```
-3.  **複製 Forwarding URL**
-    複製顯示的 HTTPS 網址，例如：`https://xxxx-xxxx.ngrok-free.app`。
-    *請記住這個網址，稍後在 n8n 設定時會用到。*
+4.  **複製 Forwarding URL**
+    複製顯示的 HTTPS 網址，例如：`https://xxxx-xxxx.ngrok-free.app`
+
+> ⚠️ Ngrok 免費版每次重啟會換網址，需重新設定 LINE Webhook。
 
 ---
 
@@ -101,7 +122,7 @@ LINE 會傳送 JSON 格式，我們需要取出使用者輸入的文字。
 1.  新增節點：**HTTP Request**。
 2.  設定：
     - **Method**: `POST`
-    - **URL**: `https://xxxx-xxxx.ngrok-free.app/analyze` (貼上您的 Ngrok 網址)
+    - **URL**: `https://your-app.up.railway.app/analyze`（貼上您的 Railway 或 Ngrok 網址）
     - **Authentication**: None
     - **Send Body**: Toggle On
     - **Body Content Type**: JSON
@@ -123,18 +144,22 @@ LINE 會傳送 JSON 格式，我們需要取出使用者輸入的文字。
         - Value: `Bearer <您的 Channel Access Token>`
     - **Send Body**: Toggle On
     - **Body Content Type**: JSON
-    - **Specify Body**:
-        ```json
+    - **Specify Body**:（點擊 Expression 模式，輸入以下內容）
+        ```javascript
+        ={{
         {
-            "replyToken": "{{ $node['Code'].json.replyToken }}",
-            "messages": [
-                {
-                    "type": "text",
-                    "text": "{{ $json.message }}"
-                }
-            ]
+          "replyToken": $node['Code'].json.replyToken,
+          "messages": [
+            {
+              "type": "text",
+              "text": $json.message
+            }
+          ]
         }
+        }}
         ```
+
+> ⚠️ **重要**：必須使用 Expression 模式（`={{...}}`），讓 n8n 自動處理 JSON 序列化，避免特殊字元造成解析錯誤。
 
 ---
 
