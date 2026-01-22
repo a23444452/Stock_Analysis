@@ -72,15 +72,31 @@ MAIL_TO=接收報告的Email
 
 ### 4. 啟動應用程式
 
-**啟動 Streamlit 網頁介面：**
+**使用啟動腳本（推薦）：**
 
 ```bash
-streamlit run app.py
+# 啟動所有服務 (Streamlit + API)
+./run.sh start
+
+# 停止所有服務
+./run.sh stop
+
+# 查看服務狀態
+./run.sh status
+
+# 查看日誌
+./run.sh logs
 ```
 
-**啟動 API Server (供 LINE Bot 使用)：**
+> 💡 腳本會自動偵測並終止佔用 port 的舊程序，無需手動清理。
+
+**手動啟動：**
 
 ```bash
+# 啟動 Streamlit 網頁介面
+streamlit run app.py
+
+# 啟動 API Server (供 LINE Bot 使用)
 uvicorn api:app --reload --port 8001
 ```
 
