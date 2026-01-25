@@ -529,17 +529,39 @@ def page_stock_analysis():
 
 def page_portfolio():
     st.header("🧘 投資組合與心態健檢")
-    
-    st.info("請輸入您的持倉配置，AI 將為您評估風險與提供建議。")
 
-    # 初始化 session state
-    if 'portfolio' not in st.session_state:
-        st.session_state.portfolio = pd.DataFrame(columns=["股票代號", "持有比例(%)"])
+    st.info("💡 您的投資組合會自動儲存，下次使用時會自動載入上次的配置。")
 
-    # 編輯表格
-    edited_df = st.data_editor(st.session_state.portfolio, num_rows="dynamic")
-    
-    if st.button("分析投資組合"):
+    # 初始化 session state (使用預設範例)
+    if 'portfolio_data' not in st.session_state:
+        # 預設範例資料
+        st.session_state.portfolio_data = pd.DataFrame({
+            "股票代號": ["2330.TW", "2454.TW", "0050.TW"],
+            "持有比例(%)": [40.0, 30.0, 30.0]
+        })
+
+    # 操作按鈕列
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        if st.button("🗑️ 清空組合"):
+            st.session_state.portfolio_data = pd.DataFrame(columns=["股票代號", "持有比例(%)"])
+            st.rerun()
+    with col2:
+        st.caption("提示：直接在表格中編輯、新增或刪除資料")
+
+    # 編輯表格 (自動儲存到 session state)
+    edited_df = st.data_editor(
+        st.session_state.portfolio_data,
+        num_rows="dynamic",
+        use_container_width=True,
+        key="portfolio_editor"
+    )
+
+    # 自動更新 session state
+    st.session_state.portfolio_data = edited_df
+
+    # 分析按鈕
+    if st.button("📊 分析投資組合", type="primary"):
         if not edited_df.empty:
             # 繪製圓餅圖
             fig = px.pie(
