@@ -414,14 +414,20 @@ def save_to_local_storage(key, data):
         data: 要儲存的資料 (會轉換為 JSON)
     """
     try:
+        # 將資料轉為 JSON 字串
         data_json = json.dumps(data, ensure_ascii=False)
-        # 使用 streamlit_js_eval 執行 JavaScript
+        # 轉義單引號以避免 JavaScript 語法錯誤
+        data_json_escaped = data_json.replace("'", "\\'")
+
+        # 使用 streamlit_js_eval 執行 JavaScript (使用 js_expressions 參數)
+        js_code = f"localStorage.setItem('{key}', '{data_json_escaped}')"
         streamlit_js_eval(
-            f"localStorage.setItem('{key}', {json.dumps(data_json)})",
-            key=f"save_{key}"
+            js_expressions=js_code,
+            key=f"save_{key}_{hash(str(data))}"  # 使用 hash 確保 key 唯一性
         )
     except Exception as e:
-        st.warning(f"儲存資料時發生錯誤: {e}")
+        # 靜默失敗,不顯示錯誤訊息 (localStorage 是增強功能,非必要)
+        pass
 
 def load_from_local_storage(key, default=None):
     """
@@ -436,8 +442,9 @@ def load_from_local_storage(key, default=None):
     """
     try:
         # 使用 streamlit_js_eval 執行 JavaScript 取得資料
+        js_code = f"localStorage.getItem('{key}')"
         result = streamlit_js_eval(
-            f"localStorage.getItem('{key}')",
+            js_expressions=js_code,
             key=f"load_{key}"
         )
         if result:
