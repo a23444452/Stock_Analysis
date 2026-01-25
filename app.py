@@ -10,6 +10,8 @@ import requests
 import time
 import pdfplumber
 import datetime
+import json
+from streamlit_js_eval import streamlit_js_eval, get_page_location
 from daily_report import get_market_summary, generate_ai_report, send_email
 from dca_tool import calculate_dca_performance
 
@@ -403,6 +405,47 @@ def extract_text_from_pdf(uploaded_file):
     except Exception as e:
         return f"PDF 解析失敗: {e}"
 
+def save_to_local_storage(key, data):
+    """
+    儲存資料到瀏覽器 localStorage
+
+    Args:
+        key: 儲存的鍵名
+        data: 要儲存的資料 (會轉換為 JSON)
+    """
+    try:
+        data_json = json.dumps(data, ensure_ascii=False)
+        # 使用 streamlit_js_eval 執行 JavaScript
+        streamlit_js_eval(
+            f"localStorage.setItem('{key}', {json.dumps(data_json)})",
+            key=f"save_{key}"
+        )
+    except Exception as e:
+        st.warning(f"儲存資料時發生錯誤: {e}")
+
+def load_from_local_storage(key, default=None):
+    """
+    從瀏覽器 localStorage 載入資料
+
+    Args:
+        key: 儲存的鍵名
+        default: 預設值
+
+    Returns:
+        載入的資料或預設值
+    """
+    try:
+        # 使用 streamlit_js_eval 執行 JavaScript 取得資料
+        result = streamlit_js_eval(
+            f"localStorage.getItem('{key}')",
+            key=f"load_{key}"
+        )
+        if result:
+            return json.loads(result)
+    except Exception:
+        pass
+    return default
+
 def format_market_cap(value):
     """將市值轉換為 '億' 單位"""
     try:
@@ -530,26 +573,49 @@ def page_stock_analysis():
 def page_portfolio():
     st.header("🧘 投資組合與心態健檢")
 
-    st.info("💡 您的投資組合會自動儲存，下次使用時會自動載入上次的配置。")
+    st.info("💡 您的投資組合會永久儲存在瀏覽器中，下次使用時會自動載入。")
 
-    # 初始化 session state (使用預設範例)
+    # 初始化 session state - 嘗試從 localStorage 載入
     if 'portfolio_data' not in st.session_state:
-        # 預設範例資料
-        st.session_state.portfolio_data = pd.DataFrame({
-            "股票代號": ["2330.TW", "2454.TW", "0050.TW"],
-            "持有比例(%)": [40.0, 30.0, 30.0]
-        })
+        # 嘗試從 localStorage 載入
+        stored_data = load_from_local_storage('stock_portfolio')
+
+        if stored_data:
+            try:
+                st.session_state.portfolio_data = pd.DataFrame(stored_data)
+                st.success("✓ 已載入您上次儲存的投資組合")
+            except Exception:
+                # 載入失敗,使用預設範例
+                st.session_state.portfolio_data = pd.DataFrame({
+                    "股票代號": ["2330.TW", "2454.TW", "0050.TW"],
+                    "持有比例(%)": [40.0, 30.0, 30.0]
+                })
+        else:
+            # 首次使用,顯示預設範例
+            st.session_state.portfolio_data = pd.DataFrame({
+                "股票代號": ["2330.TW", "2454.TW", "0050.TW"],
+                "持有比例(%)": [40.0, 30.0, 30.0]
+            })
+            st.info("👋 首次使用!以下是範例投資組合,您可以直接修改。")
 
     # 操作按鈕列
-    col1, col2 = st.columns([1, 5])
+    col1, col2, col3 = st.columns([1, 1, 4])
     with col1:
-        if st.button("🗑️ 清空組合"):
-            st.session_state.portfolio_data = pd.DataFrame(columns=["股票代號", "持有比例(%)"])
+        if st.button("💾 儲存組合"):
+            # 儲存到 localStorage
+            portfolio_dict = st.session_state.portfolio_data.to_dict('records')
+            save_to_local_storage('stock_portfolio', portfolio_dict)
+            st.success("✓ 投資組合已儲存!")
             st.rerun()
     with col2:
-        st.caption("提示：直接在表格中編輯、新增或刪除資料")
+        if st.button("🗑️ 清空組合"):
+            st.session_state.portfolio_data = pd.DataFrame(columns=["股票代號", "持有比例(%)"])
+            save_to_local_storage('stock_portfolio', [])
+            st.rerun()
+    with col3:
+        st.caption("提示：編輯後請點擊「💾 儲存組合」以永久保存")
 
-    # 編輯表格 (自動儲存到 session state)
+    # 編輯表格
     edited_df = st.data_editor(
         st.session_state.portfolio_data,
         num_rows="dynamic",
@@ -557,7 +623,7 @@ def page_portfolio():
         key="portfolio_editor"
     )
 
-    # 自動更新 session state
+    # 更新 session state
     st.session_state.portfolio_data = edited_df
 
     # 分析按鈕
