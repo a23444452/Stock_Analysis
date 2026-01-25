@@ -1,6 +1,6 @@
 import streamlit as st
 import yfinance as yf
-import google.generativeai as genai
+from google import genai
 import plotly.graph_objects as go
 import plotly.express as px
 from dotenv import load_dotenv
@@ -21,11 +21,363 @@ MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
 MAIL_TO = os.getenv("MAIL_TO")
 
 # 設定 Streamlit 頁面配置
-st.set_page_config(page_title="台股全方位 AI 助理", layout="wide")
+st.set_page_config(page_title="台股全方位 AI 助理", layout="wide", page_icon="📊")
+
+# ==========================================
+# 現代化金融主題 CSS 樣式
+# ==========================================
+
+CUSTOM_CSS = """
+<style>
+    /* ===== Google Fonts 導入 ===== */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap');
+    
+    /* ===== 根元素變數 ===== */
+    :root {
+        --bg-primary: #0E1117;
+        --bg-secondary: #1E2530;
+        --bg-card: rgba(30, 41, 59, 0.7);
+        --text-primary: #F1F5F9;
+        --text-secondary: #94A3B8;
+        --accent-blue: #60A5FA;
+        --accent-purple: #A78BFA;
+        --accent-cyan: #22D3EE;
+        --up-color: #10B981;
+        --down-color: #EF4444;
+        --border-subtle: rgba(148, 163, 184, 0.15);
+        --shadow-glow: 0 0 20px rgba(96, 165, 250, 0.15);
+    }
+    
+    /* ===== 主區域背景 ===== */
+    .stApp {
+        background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+        font-family: 'Noto Sans TC', 'Inter', sans-serif;
+    }
+    
+    /* ===== 側邊欄樣式 ===== */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, rgba(14, 17, 23, 0.95) 0%, rgba(30, 37, 48, 0.95) 100%);
+        backdrop-filter: blur(20px);
+        border-right: 1px solid var(--border-subtle);
+    }
+    
+    [data-testid="stSidebar"] .stMarkdown h1,
+    [data-testid="stSidebar"] .stMarkdown h2 {
+        background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    
+    /* ===== Radio Button (導航) 樣式 ===== */
+    [data-testid="stSidebar"] .stRadio > div {
+        gap: 0.25rem;
+    }
+    
+    [data-testid="stSidebar"] .stRadio > div > label {
+        background: transparent;
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    [data-testid="stSidebar"] .stRadio > div > label:hover {
+        background: var(--bg-card);
+        border-color: var(--border-subtle);
+        transform: translateX(4px);
+    }
+    
+    [data-testid="stSidebar"] .stRadio > div > label[data-checked="true"] {
+        background: linear-gradient(135deg, rgba(96, 165, 250, 0.2), rgba(167, 139, 250, 0.1));
+        border-color: var(--accent-blue);
+        box-shadow: var(--shadow-glow);
+    }
+    
+    /* ===== 標題樣式 ===== */
+    h1, h2, h3 {
+        color: var(--text-primary) !important;
+        font-weight: 600;
+    }
+    
+    h1 {
+        font-size: 2rem !important;
+        background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border-subtle);
+    }
+    
+    /* ===== 指標卡片 (Metrics) 樣式 ===== */
+    [data-testid="stMetric"] {
+        background: var(--bg-card);
+        backdrop-filter: blur(16px);
+        border: 1px solid var(--border-subtle);
+        border-radius: 16px;
+        padding: 1.25rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+    
+    [data-testid="stMetric"]:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-glow), 0 8px 16px rgba(0, 0, 0, 0.3);
+        border-color: var(--accent-blue);
+    }
+    
+    [data-testid="stMetricLabel"] {
+        color: var(--text-secondary) !important;
+        font-size: 0.85rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    [data-testid="stMetricValue"] {
+        color: var(--text-primary) !important;
+        font-size: 1.75rem !important;
+        font-weight: 700;
+        font-family: 'Inter', monospace;
+    }
+    
+    /* ===== 主按鈕樣式 ===== */
+    .stButton > button {
+        background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(96, 165, 250, 0.3);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px) scale(1.02);
+        box-shadow: 0 6px 20px rgba(96, 165, 250, 0.4);
+    }
+    
+    .stButton > button:active {
+        transform: translateY(0) scale(0.98);
+    }
+    
+    /* ===== 輸入框樣式 ===== */
+    .stTextInput > div > div > input,
+    .stNumberInput > div > div > input,
+    .stTextArea > div > div > textarea {
+        background: var(--bg-card) !important;
+        border: 1px solid var(--border-subtle) !important;
+        border-radius: 10px !important;
+        color: var(--text-primary) !important;
+        padding: 0.75rem 1rem !important;
+        transition: all 0.3s ease;
+    }
+    
+    .stTextInput > div > div > input:focus,
+    .stNumberInput > div > div > input:focus,
+    .stTextArea > div > div > textarea:focus {
+        border-color: var(--accent-blue) !important;
+        box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2) !important;
+    }
+    
+    /* ===== 下拉選單樣式 ===== */
+    .stSelectbox > div > div {
+        background: var(--bg-card) !important;
+        border: 1px solid var(--border-subtle) !important;
+        border-radius: 10px !important;
+    }
+    
+    /* ===== 標籤頁 (Tabs) 樣式 ===== */
+    .stTabs [data-baseweb="tab-list"] {
+        background: var(--bg-card);
+        border-radius: 12px;
+        padding: 0.5rem;
+        gap: 0.25rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background: transparent;
+        border-radius: 8px;
+        color: var(--text-secondary);
+        font-weight: 500;
+        padding: 0.75rem 1.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        color: var(--text-primary);
+        background: rgba(96, 165, 250, 0.1);
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)) !important;
+        color: white !important;
+    }
+    
+    /* ===== 圖表容器樣式 ===== */
+    [data-testid="stPlotlyChart"] {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: 16px;
+        padding: 1rem;
+        backdrop-filter: blur(12px);
+    }
+    
+    /* ===== 資訊框樣式 ===== */
+    .stAlert {
+        background: var(--bg-card) !important;
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        backdrop-filter: blur(12px);
+    }
+    
+    [data-testid="stAlertContentInfo"] {
+        background: linear-gradient(135deg, rgba(96, 165, 250, 0.1), rgba(167, 139, 250, 0.05)) !important;
+        border-left: 4px solid var(--accent-blue) !important;
+    }
+    
+    /* ===== 成功/警告/錯誤框樣式 ===== */
+    [data-testid="stAlertContentSuccess"] {
+        background: rgba(16, 185, 129, 0.1) !important;
+        border-left: 4px solid var(--up-color) !important;
+    }
+    
+    [data-testid="stAlertContentWarning"] {
+        background: rgba(245, 158, 11, 0.1) !important;
+        border-left: 4px solid #F59E0B !important;
+    }
+    
+    [data-testid="stAlertContentError"] {
+        background: rgba(239, 68, 68, 0.1) !important;
+        border-left: 4px solid var(--down-color) !important;
+    }
+    
+    /* ===== 資料表格樣式 ===== */
+    .stDataFrame {
+        background: var(--bg-card);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    
+    /* ===== 檔案上傳器樣式 ===== */
+    [data-testid="stFileUploader"] {
+        background: var(--bg-card);
+        border: 2px dashed var(--border-subtle);
+        border-radius: 12px;
+        padding: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    [data-testid="stFileUploader"]:hover {
+        border-color: var(--accent-blue);
+    }
+    
+    /* ===== Spinner 樣式 ===== */
+    .stSpinner > div {
+        border-top-color: var(--accent-blue) !important;
+    }
+    
+    /* ===== 分隔線 ===== */
+    hr {
+        border-color: var(--border-subtle) !important;
+    }
+    
+    /* ===== 自定義滾動條 ===== */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: var(--bg-primary);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: var(--border-subtle);
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--accent-blue);
+    }
+    
+    /* ===== 動畫效果 ===== */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .element-container {
+        animation: fadeIn 0.3s ease-out;
+    }
+    
+    /* ===== Expander 樣式 ===== */
+    [data-testid="stExpander"] {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+    }
+    
+    /* ===== 數據編輯器樣式 ===== */
+    [data-testid="stDataFrameResizable"] {
+        background: var(--bg-card) !important;
+        border-radius: 12px;
+    }
+</style>
+"""
+
+# 注入自定義 CSS
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ==========================================
 # 共用函數 (Utilities)
 # ==========================================
+
+# Plotly 深色金融主題配置
+PLOTLY_THEME = dict(
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)',
+    font=dict(color='#F1F5F9', family='Noto Sans TC, Inter, sans-serif'),
+    title_font=dict(size=16, color='#F1F5F9'),
+    xaxis=dict(
+        gridcolor='rgba(148, 163, 184, 0.1)',
+        linecolor='rgba(148, 163, 184, 0.2)',
+        tickfont=dict(color='#94A3B8')
+    ),
+    yaxis=dict(
+        gridcolor='rgba(148, 163, 184, 0.1)',
+        linecolor='rgba(148, 163, 184, 0.2)',
+        tickfont=dict(color='#94A3B8')
+    ),
+    legend=dict(
+        bgcolor='rgba(30, 41, 59, 0.8)',
+        bordercolor='rgba(148, 163, 184, 0.2)',
+        font=dict(color='#F1F5F9')
+    ),
+    hoverlabel=dict(
+        bgcolor='#1E2530',
+        font_size=13,
+        font_color='#F1F5F9',
+        bordercolor='#60A5FA'
+    )
+)
+
+# Plotly 配色方案
+CHART_COLORS = ['#60A5FA', '#10B981', '#A78BFA', '#F59E0B', '#EC4899', '#22D3EE']
+
+def apply_chart_theme(fig, title=None):
+    """套用統一的深色金融主題到 Plotly 圖表"""
+    fig.update_layout(
+        **PLOTLY_THEME,
+        margin=dict(l=20, r=20, t=50 if title else 20, b=20)
+    )
+    if title:
+        fig.update_layout(title=dict(text=title, x=0.5, xanchor='center'))
+    return fig
 
 def get_stock_data(ticker):
     """獲取指定股票的歷史股價與基本資料"""
@@ -105,11 +457,29 @@ def page_stock_analysis():
             # 2. K線圖
             history['MA20'] = history['Close'].rolling(window=20).mean()
             fig = go.Figure()
-            fig.add_trace(go.Candlestick(x=history.index, open=history['Open'], high=history['High'],
-                            low=history['Low'], close=history['Close'], name='K線'))
-            fig.add_trace(go.Scatter(x=history.index, y=history['MA20'], mode='lines', name='MA20', line=dict(color='orange')))
-            fig.update_layout(height=400, xaxis_rangeslider_visible=False)
-            st.plotly_chart(fig, width="stretch")
+            fig.add_trace(go.Candlestick(
+                x=history.index, 
+                open=history['Open'], 
+                high=history['High'],
+                low=history['Low'], 
+                close=history['Close'], 
+                name='K線',
+                increasing_line_color='#10B981',  # 上漲顏色
+                decreasing_line_color='#EF4444',  # 下跌顏色
+                increasing_fillcolor='#10B981',
+                decreasing_fillcolor='#EF4444'
+            ))
+            fig.add_trace(go.Scatter(
+                x=history.index, 
+                y=history['MA20'], 
+                mode='lines', 
+                name='MA20', 
+                line=dict(color='#F59E0B', width=2)
+            ))
+            fig.update_layout(height=450, xaxis_rangeslider_visible=False)
+            apply_chart_theme(fig, f"📈 {ticker_input} 股價走勢圖")
+            st.plotly_chart(fig, width='stretch')
+
 
             # 3. AI 分析
             st.subheader("🤖 Gemini 深度分析報告")
@@ -126,23 +496,25 @@ def page_stock_analysis():
             # 呼叫 Gemini
             if GOOGLE_API_KEY:
                 try:
-                    genai.configure(api_key=GOOGLE_API_KEY)
-                    model = genai.GenerativeModel('gemini-2.5-flash')
-                    
+                    client = genai.Client(api_key=GOOGLE_API_KEY)
+
                     market_cap_str = format_market_cap(info.get('marketCap'))
                     prompt = f"""
                     請分析台股 {ticker_input}。
                     【技術面數據】收盤: {latest_close}, MA20: {history['MA20'].iloc[-1]}, 市值: {market_cap_str}
                     【財報/法說會內容】
                     {report_text[:10000]} (內容過長已截斷)
-                    
+
                     請提供：
                     1. 市場趨勢判斷
                     2. 財報重點解讀 (RAG 分析)
                     3. 投資建議
                     """
                     with st.spinner("Gemini 正在思考中..."):
-                        response = model.generate_content(prompt)
+                        response = client.models.generate_content(
+                            model='gemini-2.0-flash-exp',
+                            contents=prompt
+                        )
                         st.markdown(response.text)
                 except Exception as e:
                     st.error(f"AI 分析錯誤: {e}")
@@ -170,29 +542,38 @@ def page_portfolio():
     if st.button("分析投資組合"):
         if not edited_df.empty:
             # 繪製圓餅圖
-            fig = px.pie(edited_df, values='持有比例(%)', names='股票代號', title='資產配置分佈')
-            st.plotly_chart(fig)
+            fig = px.pie(
+                edited_df, 
+                values='持有比例(%)', 
+                names='股票代號',
+                color_discrete_sequence=CHART_COLORS,
+                hole=0.4  # 甜甜圈效果
+            )
+            apply_chart_theme(fig, "💰 資產配置分佈")
+            st.plotly_chart(fig, width='stretch')
 
             # AI 分析
             if GOOGLE_API_KEY:
                 try:
-                    genai.configure(api_key=GOOGLE_API_KEY)
-                    model = genai.GenerativeModel('gemini-2.5-flash')
-                    
+                    client = genai.Client(api_key=GOOGLE_API_KEY)
+
                     portfolio_str = edited_df.to_string()
                     prompt = f"""
                     我是台股投資人，這是我的目前持倉：
                     {portfolio_str}
-                    
+
                     請擔任我的「投資心態教練」，幫我分析：
                     1. **風險評估**：這樣的配置是否過度集中？有無產業風險？
                     2. **穩健性評分** (1-10分)：並說明理由。
                     3. **調整建議**：為了達到長期穩健獲利，建議如何調整？(例如增加債券、分散產業等)
                     4. **心態建設**：給予一段關於長期投資的心態小語。
                     """
-                    
+
                     with st.spinner("AI 教練正在評估您的配置..."):
-                        response = model.generate_content(prompt)
+                        response = client.models.generate_content(
+                            model='gemini-2.0-flash-exp',
+                            contents=prompt
+                        )
                         st.markdown(response.text)
                 except Exception as e:
                     st.error(f"AI 分析錯誤: {e}")
@@ -263,23 +644,31 @@ def page_fundamental_analysis():
     ticker_input = st.text_input("輸入股票代號", value="2330.TW", key="fund_ticker")
     
     if st.button("開始基本面分析"):
+        # 只在 spinner 內做數據獲取
         with st.spinner("正在獲取財務數據..."):
             try:
                 stock = yf.Ticker(ticker_input)
                 info = stock.info
-                
+
                 # 獲取三大報表 (年報)
                 financials = stock.financials.T  # 損益表
                 balance_sheet = stock.balance_sheet.T  # 資產負債表
                 cashflow = stock.cashflow.T  # 現金流量表
-                
-                # 顯示基本資訊
-                col1, col2, col3 = st.columns(3)
-                col1.metric("目前股價", f"{info.get('currentPrice', 'N/A')}")
-                col2.metric("市值", format_market_cap(info.get('marketCap')))
-                col3.metric("產業", f"{info.get('industry', 'N/A')}")
+            except Exception as e:
+                st.error(f"發生錯誤: {e}")
+                st.stop()
 
-                # 建立分頁
+        # UI 元素移到 spinner 外面
+        try:
+            # 顯示基本資訊
+            col1, col2, col3 = st.columns(3)
+            col1.metric("目前股價", f"{info.get('currentPrice', 'N/A')}")
+            col2.metric("市值", format_market_cap(info.get('marketCap')))
+            col3.metric("產業", f"{info.get('industry', 'N/A')}")
+
+            # 建立分頁 (workaround for Streamlit tabs bug #8676)
+            tabs_wrapper = st.columns([0.999, 0.001])
+            with tabs_wrapper[0]:
                 tab1, tab2, tab3, tab4 = st.tabs(["損益表分析", "資產負債表分析", "現金流量表分析", "AI 綜合診斷"])
 
                 # 1. 損益表分析
@@ -303,12 +692,14 @@ def page_fundamental_analysis():
                             # 重新命名欄位為中文
                             df_plot = df_plot.rename(columns=col_map)
                             
-                            fig = px.bar(df_plot, barmode='group', title="年度營收與獲利趨勢")
-                            st.plotly_chart(fig, width="stretch")
-                            st.dataframe(financials.head())
+                            fig = px.bar(df_plot, barmode='group', color_discrete_sequence=CHART_COLORS)
+                            apply_chart_theme(fig, "📈 年度營收與獲利趨勢")
+                            fig.update_layout(height=400)
+                            st.plotly_chart(fig, width='stretch', key="chart_income")
+                            st.dataframe(financials.head().reset_index(), key="df_income", hide_index=True)
                         else:
                             st.warning("無法抓取完整的損益表欄位")
-                            st.dataframe(financials)
+                            st.dataframe(financials.reset_index(), key="df_income_full", hide_index=True)
                     else:
                         st.warning("無損益表數據")
 
@@ -337,12 +728,14 @@ def page_fundamental_analysis():
                             # 重新命名欄位為中文
                             df_plot = df_plot.rename(columns=col_map)
 
-                            fig = px.bar(df_plot, barmode='group', title="資產負債結構趨勢")
-                            st.plotly_chart(fig, width="stretch")
-                            st.dataframe(balance_sheet.head())
+                            fig = px.bar(df_plot, barmode='group', color_discrete_sequence=CHART_COLORS)
+                            apply_chart_theme(fig, "🏦 資產負債結構趨勢")
+                            fig.update_layout(height=400)
+                            st.plotly_chart(fig, width='stretch', key="chart_balance")
+                            st.dataframe(balance_sheet.head().reset_index(), key="df_balance", hide_index=True)
                         else:
                             st.warning("無法抓取完整的資產負債表欄位")
-                            st.dataframe(balance_sheet)
+                            st.dataframe(balance_sheet.reset_index(), key="df_balance_full", hide_index=True)
                     else:
                         st.warning("無資產負債表數據")
 
@@ -365,12 +758,14 @@ def page_fundamental_analysis():
                             # 重新命名欄位為中文
                             df_plot = df_plot.rename(columns=col_map)
 
-                            fig = px.bar(df_plot, barmode='group', title="現金流量趨勢")
-                            st.plotly_chart(fig, width="stretch")
-                            st.dataframe(cashflow.head())
+                            fig = px.bar(df_plot, barmode='group', color_discrete_sequence=CHART_COLORS)
+                            apply_chart_theme(fig, "💵 現金流量趨勢")
+                            fig.update_layout(height=400)
+                            st.plotly_chart(fig, width='stretch', key="chart_cashflow")
+                            st.dataframe(cashflow.head().reset_index(), key="df_cashflow", hide_index=True)
                         else:
                             st.warning("無法抓取完整的現金流量表欄位")
-                            st.dataframe(cashflow)
+                            st.dataframe(cashflow.reset_index(), key="df_cashflow_full", hide_index=True)
                     else:
                         st.warning("無現金流量表數據")
 
@@ -414,8 +809,8 @@ def page_fundamental_analysis():
                     else:
                         st.warning("請設定 GOOGLE_API_KEY 以啟用 AI 分析功能")
 
-            except Exception as e:
-                st.error(f"發生錯誤: {e}")
+        except Exception as e:
+            st.error(f"發生錯誤: {e}")
 
 # ==========================================
 # 頁面 5: 定期定額回測
@@ -464,9 +859,9 @@ def page_dca_backtest():
                     y=df_result['Portfolio_Value'], 
                     mode='lines', 
                     name='資產價值',
-                    line=dict(color='#00CC96', width=2),
-                    fill='tozeroy', # 填滿下方區域
-                    fillcolor='rgba(0, 204, 150, 0.1)'
+                    line=dict(color='#10B981', width=2.5),
+                    fill='tozeroy',
+                    fillcolor='rgba(16, 185, 129, 0.15)'
                 ))
                 
                 # 繪製投入成本 (階梯狀)
@@ -475,17 +870,19 @@ def page_dca_backtest():
                     y=df_result['Total_Cost'], 
                     mode='lines', 
                     name='累積投入成本',
-                    line=dict(color='#EF553B', width=2, dash='dash')
+                    line=dict(color='#60A5FA', width=2, dash='dash')
                 ))
 
                 fig.update_layout(
-                    title=f"{ticker_input} 定期定額 {years} 年績效走勢",
                     xaxis_title="日期",
                     yaxis_title="金額 (TWD)",
                     hovermode="x unified",
-                    legend=dict(orientation="h", y=1.02, yanchor="bottom", x=1, xanchor="right")
+                    legend=dict(orientation="h", y=1.02, yanchor="bottom", x=1, xanchor="right"),
+                    height=450
                 )
-                st.plotly_chart(fig, width="stretch")
+                apply_chart_theme(fig, f"📊 {ticker_input} 定期定額 {years} 年績效走勢")
+                st.plotly_chart(fig, width='stretch')
+
 
                 # 3. AI 策略分析
                 st.subheader("🤖 Gemini 策略分析報告")
@@ -525,19 +922,58 @@ def page_dca_backtest():
 # ==========================================
 
 def main():
-    st.sidebar.title("台股 AI 助理")
-    page = st.sidebar.radio("功能選單", ["個股全方位分析", "基本面 AI 分析", "投資組合健檢", "定期定額回測", "自動化日報助理"])
+    # ===== 側邊欄 Logo 區塊 =====
+    st.sidebar.markdown("""
+    <div style="text-align: center; padding: 1.5rem 0 1rem 0;">
+        <div style="font-size: 3rem; margin-bottom: 0.5rem;">📊</div>
+        <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700; 
+            background: linear-gradient(135deg, #60A5FA, #22D3EE);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;">
+            台股 AI 助理
+        </h2>
+        <p style="color: #94A3B8; font-size: 0.85rem; margin-top: 0.25rem;">
+            智能投資決策平台
+        </p>
+    </div>
+    <hr style="border-color: rgba(148, 163, 184, 0.15); margin: 0.5rem 0 1.5rem 0;">
+    """, unsafe_allow_html=True)
+    
+    # ===== 功能選單 (帶圖標) =====
+    menu_options = {
+        "📈 個股全方位分析": "個股全方位分析",
+        "📊 基本面 AI 分析": "基本面 AI 分析",
+        "🧘 投資組合健檢": "投資組合健檢",
+        "⏳ 定期定額回測": "定期定額回測",
+        "🤖 自動化日報助理": "自動化日報助理"
+    }
+    
+    st.sidebar.markdown("<p style='color: #94A3B8; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem;'>功能選單</p>", unsafe_allow_html=True)
+    
+    page = st.sidebar.radio("功能選單", list(menu_options.keys()), label_visibility="collapsed")
+    selected_page = menu_options[page]
+    
+    # ===== 頁尾資訊 =====
+    st.sidebar.markdown("""
+    <div style="position: fixed; bottom: 1rem; left: 1rem; right: 1rem; max-width: 280px;">
+        <hr style="border-color: rgba(148, 163, 184, 0.15); margin-bottom: 1rem;">
+        <p style="color: #64748B; font-size: 0.75rem; text-align: center;">
+            Powered by <span style="color: #60A5FA;">Gemini AI</span> & yfinance
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    if page == "個股全方位分析":
+    if selected_page == "個股全方位分析":
         page_stock_analysis()
-    elif page == "基本面 AI 分析":
+    elif selected_page == "基本面 AI 分析":
         page_fundamental_analysis()
-    elif page == "投資組合健檢":
+    elif selected_page == "投資組合健檢":
         page_portfolio()
-    elif page == "定期定額回測":
+    elif selected_page == "定期定額回測":
         page_dca_backtest()
-    elif page == "自動化日報助理":
+    elif selected_page == "自動化日報助理":
         page_daily_report()
+
 
 if __name__ == "__main__":
     main()
