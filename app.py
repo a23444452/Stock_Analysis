@@ -476,17 +476,62 @@ def get_financial_report_text(ticker):
 def page_stock_analysis():
     st.header("📈 個股全方位分析")
 
+    # 初始化 session state
+    if 'stock_analysis' not in st.session_state:
+        st.session_state.stock_analysis = {
+            'ticker': '2330.TW',
+            'history': None,
+            'info': None,
+            'ai_report': None,
+            'analyzed': False
+        }
+
+    # 載入上次使用的股票代號
+    if 'last_ticker' not in st.session_state:
+        last_ticker = load_from_local_storage('last_stock_ticker', '2330.TW')
+        if last_ticker:
+            st.session_state.stock_analysis['ticker'] = last_ticker
+
     col1, col2 = st.columns([1, 3])
     with col1:
-        ticker_input = st.text_input("輸入股票代號", value="2330.TW")
+        ticker_input = st.text_input(
+            "輸入股票代號",
+            value=st.session_state.stock_analysis['ticker'],
+            key="ticker_input"
+        )
+
+        # 當股票代號改變時,清除舊的分析結果
+        if ticker_input != st.session_state.stock_analysis['ticker']:
+            st.session_state.stock_analysis['analyzed'] = False
+            st.session_state.stock_analysis['ticker'] = ticker_input
+
         uploaded_file = st.file_uploader("上傳財報 PDF (選填)", type="pdf")
-        run_analysis = st.button("開始 AI 診斷")
+
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            run_analysis = st.button("🔍 開始分析", type="primary")
+        with col_btn2:
+            if st.button("🗑️ 清除"):
+                st.session_state.stock_analysis = {
+                    'ticker': '2330.TW',
+                    'history': None,
+                    'info': None,
+                    'ai_report': None,
+                    'analyzed': False
+                }
+                st.rerun()
 
     if run_analysis:
+        # 儲存股票代號到 localStorage
+        save_to_local_storage('last_stock_ticker', ticker_input)
+
         with st.spinner("正在獲取數據..."):
             history, info = get_stock_data(ticker_input)
 
         if history is not None and not history.empty:
+            # 儲存數據到 session state
+            st.session_state.stock_analysis['history'] = history
+            st.session_state.stock_analysis['info'] = info
             # 1. 數據概覽
             latest_close = history['Close'].iloc[-1]
             change = latest_close - history['Close'].iloc[-2]
@@ -558,6 +603,9 @@ def page_stock_analysis():
                             model='gemini-2.0-flash-exp',
                             contents=prompt
                         )
+                        # 儲存 AI 報告到 session state
+                        st.session_state.stock_analysis['ai_report'] = response.text
+                        st.session_state.stock_analysis['analyzed'] = True
                         st.markdown(response.text)
                 except Exception as e:
                     st.error(f"AI 分析錯誤: {e}")
@@ -565,6 +613,56 @@ def page_stock_analysis():
                 st.warning("請設定 GOOGLE_API_KEY")
         else:
             st.error("找不到股票數據")
+
+    # 顯示快取的分析結果 (切換頁面後回來時顯示)
+    elif st.session_state.stock_analysis['analyzed']:
+        st.info("💡 以下是您上次的分析結果,如需重新分析請點擊「🔍 開始分析」")
+
+        history = st.session_state.stock_analysis['history']
+        info = st.session_state.stock_analysis['info']
+        ticker_input = st.session_state.stock_analysis['ticker']
+
+        if history is not None and not history.empty:
+            # 1. 數據概覽
+            latest_close = history['Close'].iloc[-1]
+            change = latest_close - history['Close'].iloc[-2]
+            pct_change = (change / history['Close'].iloc[-2]) * 100
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("目前股價", f"{latest_close:.2f}", f"{change:.2f} ({pct_change:.2f}%)")
+            c2.metric("本益比 (PE)", f"{info.get('trailingPE', 'N/A')}")
+            c3.metric("市值", format_market_cap(info.get('marketCap')))
+
+            # 2. K線圖
+            history['MA20'] = history['Close'].rolling(window=20).mean()
+            fig = go.Figure()
+            fig.add_trace(go.Candlestick(
+                x=history.index,
+                open=history['Open'],
+                high=history['High'],
+                low=history['Low'],
+                close=history['Close'],
+                name='K線',
+                increasing_line_color='#10B981',
+                decreasing_line_color='#EF4444',
+                increasing_fillcolor='#10B981',
+                decreasing_fillcolor='#EF4444'
+            ))
+            fig.add_trace(go.Scatter(
+                x=history.index,
+                y=history['MA20'],
+                mode='lines',
+                name='MA20',
+                line=dict(color='#F59E0B', width=2)
+            ))
+            fig.update_layout(height=450, xaxis_rangeslider_visible=False)
+            apply_chart_theme(fig, f"📈 {ticker_input} 股價走勢圖")
+            st.plotly_chart(fig, width='stretch')
+
+            # 3. 顯示快取的 AI 分析
+            if st.session_state.stock_analysis['ai_report']:
+                st.subheader("🤖 Gemini 深度分析報告")
+                st.markdown(st.session_state.stock_analysis['ai_report'])
 
 # ==========================================
 # 頁面 2: 投資組合與心態
