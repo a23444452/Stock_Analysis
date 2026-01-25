@@ -703,12 +703,21 @@ def page_portfolio():
             })
             st.info("👋 首次使用!以下是範例投資組合,您可以直接修改。")
 
+    # 編輯表格 (移到按鈕前面,避免重新渲染問題)
+    edited_df = st.data_editor(
+        st.session_state.portfolio_data,
+        num_rows="dynamic",
+        use_container_width=True,
+        key="portfolio_editor"
+    )
+
     # 操作按鈕列
     col1, col2, col3 = st.columns([1, 1, 4])
     with col1:
         if st.button("💾 儲存組合"):
-            # 儲存到 localStorage
-            portfolio_dict = st.session_state.portfolio_data.to_dict('records')
+            # 更新 session state 並儲存到 localStorage
+            st.session_state.portfolio_data = edited_df
+            portfolio_dict = edited_df.to_dict('records')
             save_to_local_storage('stock_portfolio', portfolio_dict)
             st.success("✓ 投資組合已儲存!")
             st.rerun()
@@ -720,19 +729,10 @@ def page_portfolio():
     with col3:
         st.caption("提示：編輯後請點擊「💾 儲存組合」以永久保存")
 
-    # 編輯表格
-    edited_df = st.data_editor(
-        st.session_state.portfolio_data,
-        num_rows="dynamic",
-        use_container_width=True,
-        key="portfolio_editor"
-    )
-
-    # 更新 session state
-    st.session_state.portfolio_data = edited_df
-
     # 分析按鈕
     if st.button("📊 分析投資組合", type="primary"):
+        # 先更新 session state
+        st.session_state.portfolio_data = edited_df
         if not edited_df.empty:
             # 繪製圓餅圖
             fig = px.pie(
