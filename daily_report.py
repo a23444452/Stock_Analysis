@@ -3,7 +3,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import yfinance as yf
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 import datetime
 
@@ -39,22 +39,24 @@ def generate_ai_report(market_data):
     if not GOOGLE_API_KEY:
         return "錯誤：未設定 GOOGLE_API_KEY"
     
-    genai.configure(api_key=GOOGLE_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-flash')
-    
+    client = genai.Client(api_key=GOOGLE_API_KEY)
+
     prompt = f"""
     請撰寫一份簡短的台股收盤日報。
-    
+
     【今日市場數據】
     {market_data}
-    
+
     【撰寫要求】
     1. 總結今日重點個股表現。
     2. 給予明日操作的一句話建議。
     3. 語氣專業且激勵人心。
     """
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model='gemini-2.0-flash-exp',
+            contents=prompt
+        )
         return response.text
     except Exception as e:
         return f"AI 生成失敗: {e}"
