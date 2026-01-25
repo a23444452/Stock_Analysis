@@ -453,6 +453,38 @@ def load_from_local_storage(key, default=None):
         pass
     return default
 
+def normalize_ticker(ticker):
+    """
+    正規化股票代號 - 自動補上 .TW 後綴
+
+    Args:
+        ticker: 使用者輸入的股票代號
+
+    Returns:
+        正規化後的股票代號
+
+    Examples:
+        normalize_ticker("2330") -> "2330.TW"
+        normalize_ticker("2330.TW") -> "2330.TW"
+        normalize_ticker("0050") -> "0050.TW"
+    """
+    if not ticker:
+        return ticker
+
+    # 移除前後空白
+    ticker = ticker.strip()
+
+    # 如果已經有後綴,直接返回
+    if '.' in ticker:
+        return ticker.upper()
+
+    # 純數字代號,自動加上 .TW
+    if ticker.isdigit():
+        return f"{ticker}.TW"
+
+    # 其他情況(可能是美股等),原樣返回
+    return ticker.upper()
+
 def format_market_cap(value):
     """將市值轉換為 '億' 單位"""
     try:
@@ -501,16 +533,24 @@ def page_stock_analysis():
 
     col1, col2 = st.columns([1, 3])
     with col1:
-        ticker_input = st.text_input(
+        ticker_input_raw = st.text_input(
             "輸入股票代號",
             value=st.session_state.stock_analysis['ticker'],
-            key="ticker_input"
+            key="ticker_input",
+            help="輸入數字代號即可 (例如: 2330),系統會自動補上 .TW"
         )
+
+        # 正規化股票代號
+        ticker_input = normalize_ticker(ticker_input_raw)
 
         # 當股票代號改變時,清除舊的分析結果
         if ticker_input != st.session_state.stock_analysis['ticker']:
             st.session_state.stock_analysis['analyzed'] = False
             st.session_state.stock_analysis['ticker'] = ticker_input
+
+        # 顯示正規化後的代號
+        if ticker_input != ticker_input_raw:
+            st.caption(f"✓ 使用代號: {ticker_input}")
 
         uploaded_file = st.file_uploader("上傳財報 PDF (選填)", type="pdf")
 
@@ -834,8 +874,18 @@ def page_fundamental_analysis():
     st.header("📊 基本面 AI 分析")
     st.info("深入分析公司財務報表：損益表、資產負債表與現金流量表。")
 
-    ticker_input = st.text_input("輸入股票代號", value="2330.TW", key="fund_ticker")
-    
+    ticker_input_raw = st.text_input(
+        "輸入股票代號",
+        value="2330.TW",
+        key="fund_ticker",
+        help="輸入數字代號即可 (例如: 2330),系統會自動補上 .TW"
+    )
+    ticker_input = normalize_ticker(ticker_input_raw)
+
+    # 顯示正規化後的代號
+    if ticker_input != ticker_input_raw:
+        st.caption(f"✓ 使用代號: {ticker_input}")
+
     if st.button("開始基本面分析"):
         # 只在 spinner 內做數據獲取
         with st.spinner("正在獲取財務數據..."):
@@ -1017,7 +1067,18 @@ def page_dca_backtest():
     
     with col1:
         st.subheader("參數設定")
-        ticker_input = st.text_input("輸入股票代號", value="2330.TW", key="dca_ticker")
+        ticker_input_raw = st.text_input(
+            "輸入股票代號",
+            value="2330.TW",
+            key="dca_ticker",
+            help="輸入數字代號即可 (例如: 2330),系統會自動補上 .TW"
+        )
+        ticker_input = normalize_ticker(ticker_input_raw)
+
+        # 顯示正規化後的代號
+        if ticker_input != ticker_input_raw:
+            st.caption(f"✓ 使用代號: {ticker_input}")
+
         monthly_amount = st.number_input("每月扣款金額 (TWD)", min_value=1000, value=10000, step=1000)
         years = st.selectbox("回測年數", [1, 3, 5, 10], index=1)
         
