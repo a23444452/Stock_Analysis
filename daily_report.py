@@ -38,7 +38,7 @@ def get_market_summary(tickers):
 def generate_ai_report(market_data):
     if not GOOGLE_API_KEY:
         return "錯誤：未設定 GOOGLE_API_KEY"
-    
+
     client = genai.Client(api_key=GOOGLE_API_KEY)
 
     prompt = f"""
@@ -54,7 +54,7 @@ def generate_ai_report(market_data):
     """
     try:
         response = client.models.generate_content(
-            model='gemini-2.0-flash-exp',
+            model='gemini-2.5-flash',
             contents=prompt
         )
         return response.text

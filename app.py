@@ -647,7 +647,7 @@ def page_stock_analysis():
                     """
                     with st.spinner("Gemini 正在思考中..."):
                         response = client.models.generate_content(
-                            model='gemini-2.0-flash-exp',
+                            model='gemini-2.5-flash',
                             contents=prompt
                         )
                         # 儲存 AI 報告到 session state
@@ -804,7 +804,7 @@ def page_portfolio():
 
                     with st.spinner("AI 教練正在評估您的配置..."):
                         response = client.models.generate_content(
-                            model='gemini-2.0-flash-exp',
+                            model='gemini-2.5-flash',
                             contents=prompt
                         )
                         st.markdown(response.text)
@@ -1022,30 +1022,32 @@ def page_fundamental_analysis():
                             fin_summary = financials.iloc[:2].to_string() if not financials.empty else "無數據"
                             bs_summary = balance_sheet.iloc[:2].to_string() if not balance_sheet.empty else "無數據"
                             cf_summary = cashflow.iloc[:2].to_string() if not cashflow.empty else "無數據"
-                            
+
                             prompt = f"""
                             請擔任專業的財務分析師，針對 {ticker_input} 的財務報表進行深度分析。
-                            
+
                             【損益表摘要 (近兩年)】
                             {fin_summary}
-                            
+
                             【資產負債表摘要 (近兩年)】
                             {bs_summary}
-                            
+
                             【現金流量表摘要 (近兩年)】
                             {cf_summary}
-                            
+
                             請提供以下分析報告 (使用繁體中文 Markdown)：
                             1. **獲利能力分析**：營收成長率、毛利率、淨利率的變化趨勢。
                             2. **財務結構與償債能力**：資產負債配置是否健康？有無流動性風險？
                             3. **現金流品質**：營業現金流是否充足？投資活動是否積極？
                             4. **綜合評價**：給予該公司基本面評分 (1-10分) 與投資建議。
                             """
-                            
+
                             try:
-                                genai.configure(api_key=GOOGLE_API_KEY)
-                                model = genai.GenerativeModel('gemini-2.5-flash')
-                                response = model.generate_content(prompt)
+                                client = genai.Client(api_key=GOOGLE_API_KEY)
+                                response = client.models.generate_content(
+                                    model='gemini-2.5-flash',
+                                    contents=prompt
+                                )
                                 st.markdown(response.text)
                             except Exception as e:
                                 st.error(f"AI 分析失敗: {e}")
@@ -1144,25 +1146,27 @@ def page_dca_backtest():
                     with st.spinner("AI 正在分析此策略的風險與報酬..."):
                         prompt = f"""
                         請分析以下「定期定額 (DCA)」投資策略的績效：
-                        
+
                         *   **標的**：{ticker_input}
                         *   **期間**：過去 {years} 年
                         *   **每月投入**：{monthly_amount} TWD
                         *   **總報酬率**：{ret_pct:.2f}%
                         *   **最大回撤 (MDD)**：{mdd:.2f}% (這段期間資產從高點下跌的最大幅度)
                         *   **年化波動率**：{metrics['volatility']:.2f}%
-                        
+
                         請提供一份專業的分析報告 (使用繁體中文 Markdown)：
                         1.  **績效評價**：這樣的報酬率在該期間是否優於大盤或定存？
                         2.  **風險分析**：MDD {mdd:.2f}% 代表投資人需承受多大的心理壓力？波動率是否過高？
                         3.  **微笑曲線效應**：根據走勢 (AI 無法看圖，請根據一般 DCA 特性說明)，這段期間是否有發揮定期定額「低檔多買」的優勢？
                         4.  **投資建議**：適合哪種類型的投資人？(保守/穩健/積極)
                         """
-                        
+
                         try:
-                            genai.configure(api_key=GOOGLE_API_KEY)
-                            model = genai.GenerativeModel('gemini-2.5-flash')
-                            response = model.generate_content(prompt)
+                            client = genai.Client(api_key=GOOGLE_API_KEY)
+                            response = client.models.generate_content(
+                                model='gemini-2.5-flash',
+                                contents=prompt
+                            )
                             st.markdown(response.text)
                         except Exception as e:
                             st.error(f"AI 分析失敗: {e}")
